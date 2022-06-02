@@ -1,0 +1,102 @@
+---
+title: "Pratical Machine Learning Final Project"
+author: "Jason Parise"
+date: "`r Sys.Date()`"
+output:
+html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## TITLE: Practical Machine Learning - Quantified Self Movement Data Analysis
+
+## OVERVIEW: In this analysis, the way in which 20 individuals performed their exercise routines as monitored by personal exercise monitoring devices such as Jawbone Up, Nike FuelBand, and Fitbit will be determined using machine learning techniques. A model will be developed to predict how each person will approach each exercise with cross validation, accuracy and statistical analysis, and final graphical result visualization.  
+
+## Required packages as used in RStudio
+```{r  Required packages, echo=TRUE}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(knitr)
+library(ggplot2)
+library(markdown)
+library(graphics)
+library(grDevices)
+library(methods)
+library(stats)
+library(corrplot)
+library(utils)
+library(randomForest)
+library(RColorBrewer)
+library(rattle)
+```
+
+## Loading the datasets.
+```{r  datasets, echo=TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
+destfile = "pml-training.csv", method = "curl")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
+destfile = "pml-testing.csv", method = "curl")
+TrainingData <- read.csv("./pml-training.csv")
+TestData <- read.csv("./pml-testing.csv")
+```
+
+## Reviewing the data, and cleaning it to remove incomplete NA and unneeded columns, while taking the predictive variable outcome 'classe'.
+```{r  cleaning, echo=TRUE}
+dim(TrainingData)
+dim(TestData)
+sum(complete.cases(TrainingData))
+sum(complete.cases(TestData))
+TrainingData1 <- TrainingData[, colSums(is.na(TrainingData))==0] 
+TestData1 <- TestData[, colSums(is.na(TestData))==0] 
+classe <- TrainingData1$classe
+TrainingData2 <- grepl("^X|timestamp|window", names(TrainingData1))
+TrainingData1 <- TrainingData1[, !TrainingData2]
+TrainingData3 <- TrainingData1[, sapply(TrainingData1, is.numeric)]
+TrainingData3$classe <- classe
+TestData2 <- grepl("^X|timestamp|window", names(TestData1))
+TestData1 <- TestData1[, !TestData2]
+TestData3 <- TestData1[, sapply(TestData1, is.numeric)]
+```
+
+## Creating cross validation dataset from cleaned data comprising of 30% of the available  dataset.
+```{r  validation, echo=TRUE}
+set.seed(10000)
+TrainingData4 <- createDataPartition(TrainingData3$classe, p=0.70, list=F)
+TrainingData5 <- TrainingData3[TrainingData4, ]
+ValData <- TrainingData3[-TrainingData4, ]
+```
+
+## MODEL: Creating a predictive model (At ntree=100, processing time may take a little time.)
+```{r  model, echo=TRUE}
+TControl1 <- trainControl(method="cv", 5)
+Model1 <- train(classe ~ ., data=TrainingData5, method="rf", trControl=TControl1, ntree=100)
+Model1
+```
+
+## Estimating the general performance of the model and accuracy vs the validation dataset.
+```{r  estimation, echo=TRUE}
+ModPredict <- predict(Model1, ValData)
+confusionMatrix(ModPredict, as.factor(ValData$classe))
+accuracy <- postResample(ModPredict, as.factor(ValData$classe))
+accuracy
+```
+
+## Final predictions for the test data set.
+```{r  prediction, echo=TRUE}
+result <- predict(Model1, TestData3[, -length(names(TestData3))])
+result
+```
+
+## Visual representation of the dataset and results: Correlation Matrix Visualization and Classification Tree
+```{r  visulization, echo=TRUE}
+corrplot <- cor(TrainingData5[, -length(names(TrainingData5))])
+corrplot(corrplot, method="color")
+Tree <- rpart(classe ~ ., data=TrainingData5, method="class")
+fancyRpartPlot(Tree)
+```
+
+
+
